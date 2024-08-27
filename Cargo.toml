@@ -1,0 +1,17 @@
+[package]
+name = "crunchy_bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chatgpt_rs = "1.2.3"
+dotenvy = "0.15.7"
+env_logger = "0.11.5"
+futures = "0.3.30"
+log = "0.4.22"
+pretty_env_logger = "0.5.0"
+reqwest =  { version = "0.12.7", features = ["json"] }
+rust_decimal = "1.36.0"
+serde = { version = "1.0.208", features = ["derive"]}
+teloxide = { version = "0.13.0", features = ["macros"]}
+tokio = { version = "1.39.3", features = ["full"] }
