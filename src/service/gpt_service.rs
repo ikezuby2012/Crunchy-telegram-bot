@@ -1,6 +1,4 @@
 use chatgpt::prelude::*;
-use reqwest::Response;
-use teloxide::net::client_from_env;
 use std::env;
 
 #[tokio::main]

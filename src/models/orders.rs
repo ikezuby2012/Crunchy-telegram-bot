@@ -1,7 +1,5 @@
 use serde::Deserialize;
-use teloxide::{
-    utils::command::BotCommands,
-};
+use teloxide::utils::command::BotCommands;
 
 #[derive(Clone, Default)]
 pub enum State {
@@ -10,7 +8,19 @@ pub enum State {
     ReceiveFullName,
     HandleConversation {
         message: String,
-    }
+    },
+    HandlePrompt {
+        message: String,
+    },
+    HandleSoccer {
+        message: String,
+    },
+    HandleMovie {
+        message: String,
+    },
+    HandleCrypto {
+        message: String,
+    },
 }
 
 #[derive(BotCommands, Clone)]
