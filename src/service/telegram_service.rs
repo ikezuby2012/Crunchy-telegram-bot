@@ -1,4 +1,5 @@
 use log::{error, info};
+use reqwest::Response;
 use std::env;
 use tokio::task;
 
@@ -19,7 +20,7 @@ use crate::{
         assets::MessageError,
         orders::{Command as OtherCommand, State},
     },
-    service::soccer_service,
+    service::{movie_service, soccer_service},
     utils::{custom_error_handler::CustomErrorHandler, data::PROMPT_DATA},
 };
 
@@ -77,8 +78,14 @@ pub fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'stat
     dialogue::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)
         .branch(callback_query_handler)
+        .branch(dptree::endpoint(handle_unknown_update))
 }
+
 pub async fn start(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+    bot.set_chat_menu_button()
+        .chat_id(msg.chat.id)
+        .menu_button(teloxide::types::MenuButton::Commands)
+        .await?;
     bot.send_message(msg.chat.id, "let's start! what's your name")
         .await?;
     dialogue.update(State::ReceiveFullName).await?;
@@ -158,26 +165,31 @@ pub async fn handle_prompt(
             Ok(prompts) => {
                 let buttons = prompts
                     .into_iter()
-                    .map(|service| KeyboardButton::new(service));
+                    .map(|service| InlineKeyboardButton::callback(service, service));
 
                 bot.answer_callback_query(&q.id).await?;
-                bot.send_message(dialogue.chat_id(), "select a service:")
-                    .reply_markup(KeyboardMarkup::new([buttons]))
-                    .await?;
 
-                if service == "Get Live Scores" {
-                    dialogue
-                        .update(State::HandleSoccer { message: service })
+                if let Some(message) = q.message {
+                    bot.edit_message_text(message.chat().id, message.id(), "Select a service:")
+                        .reply_markup(InlineKeyboardMarkup::new([buttons]))
                         .await?;
-                } else if service == "Get latest crypto charts" {
-                    dialogue
-                        .update(State::HandleCrypto { message: service })
-                        .await?;
-                } else if service == "top trending movies" {
-                    dialogue
-                        .update(State::HandleMovie { message: service })
+                } else {
+                    bot.send_message(dialogue.chat_id(), "Select a service:")
+                        .reply_markup(InlineKeyboardMarkup::new([buttons]))
                         .await?;
                 }
+
+                let new_state = match service.as_str() {
+                    "Get Live Scores" => State::HandleSoccer { message: service },
+                    "Get latest crypto charts" => State::HandleCrypto { message: service },
+                    "top trending movies" => State::HandleMovie { message: service },
+                    _ => {
+                        log::warn!("Unrecognized service: {}", service);
+                        State::Start // or some other appropriate state
+                    }
+                };
+
+                dialogue.update(new_state).await?;
             }
             Err(err) => {
                 log::error!(
@@ -201,7 +213,35 @@ pub async fn handle_soccer(
     q: CallbackQuery,
 ) -> HandlerResult {
     if let Some(service) = q.data {
-        log::info!("this is the message {}", &service);
+        log::info!("this is the message  >>>>>>>> {}", &service);
+
+        match service.as_str() {
+            "today event" => {
+                match soccer_service::today_events().await {
+                    Ok(events) => {
+                        // Format and send the events data
+                        // let format_events = format_events(events);
+                        let message = "hjhbhhhhg".to_owned();
+                        bot.send_message(dialogue.chat_id(), message).await?;
+                    }
+                    Err(err) => {
+                        log::error!("Failed to fetch today's events: {}", err);
+                        bot.send_message(
+                            dialogue.chat_id(),
+                            "Sorry, I couldn't fetch today's events. Please try again later.",
+                        )
+                        .await?;
+                    }
+                }
+            }
+            _ => {
+                bot.send_message(
+                    dialogue.chat_id(),
+                    "Sorry, I don't recognize that command. Please choose a valid option.",
+                )
+                .await?;
+            }
+        }
     }
     Ok(())
 }
@@ -215,6 +255,80 @@ pub async fn handle_movie(
 ) -> HandlerResult {
     if let Some(service) = q.data {
         log::info!("this is the message {}", &service);
+
+        match service.as_str() {
+            "Top trending Movie" => match movie_service::trending_movie().await {
+                Ok(response) => {
+                    bot.send_message(dialogue.chat_id(), "Trending Movies".to_owned()).await?;
+                    for movie in response {
+                        bot.send_message(dialogue.chat_id(), movie).await?;
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to fetch today's events: {}", err);
+                    bot.send_message(
+                        dialogue.chat_id(),
+                        "Sorry, I couldn't fetch today's events. Please try again later.",
+                    )
+                    .await?;
+                }
+            },
+            "Popular Movie" => match movie_service::popular_movie().await {
+                Ok(response) => {
+                    bot.send_message(dialogue.chat_id(), "Popular Movies: ".to_owned()).await?;
+                    for movie in response {
+                        bot.send_message(dialogue.chat_id(), movie).await?;
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to fetch today's events: {}", err);
+                    bot.send_message(
+                        dialogue.chat_id(),
+                        "Sorry, I couldn't fetch today's events. Please try again later.",
+                    )
+                    .await?;
+                }
+            },
+            "Movies in Theatres" => match movie_service::get_movies_in_theatres().await {
+                Ok(response) => {
+                    bot.send_message(dialogue.chat_id(), "Get a list of movies that are currently in theatres.: ".to_owned()).await?;
+                    for movie in response {
+                        bot.send_message(dialogue.chat_id(), movie).await?;
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to fetch today's events: {}", err);
+                    bot.send_message(
+                        dialogue.chat_id(),
+                        "Sorry, I couldn't fetch today's events. Please try again later.",
+                    )
+                    .await?;
+                }
+            },
+            "Upcoming Movie" => match movie_service::upcoming_movie().await {
+                Ok(response) => {
+                    bot.send_message(dialogue.chat_id(), "Get a list of movies that will be released soon: ".to_owned()).await?;
+                    for movie in response {
+                        bot.send_message(dialogue.chat_id(), movie).await?;
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to fetch today's events: {}", err);
+                    bot.send_message(
+                        dialogue.chat_id(),
+                        "Sorry, I couldn't fetch today's events. Please try again later.",
+                    )
+                    .await?;
+                }
+            },
+            _ => {
+                bot.send_message(
+                    dialogue.chat_id(),
+                    "Sorry, I don't recognize that command. Please choose a valid option.",
+                )
+                .await?;
+            }
+        }
     }
     Ok(())
 }
@@ -229,6 +343,11 @@ pub async fn handle_crypto(
     if let Some(service) = q.data {
         log::info!("this is the message {}", &service);
     }
+    Ok(())
+}
+
+async fn handle_unknown_update(update: Update) -> HandlerResult {
+    log::warn!("Received unknown update: {:?}", update);
     Ok(())
 }
 

@@ -6,7 +6,7 @@ lazy_static! {
         let mut m = HashMap::new();
         m.insert(
             "Get Live Scores".to_string(),
-            vec!["current event", "Live match", "transfer window", "Odds for all event scheduled"],
+            vec!["today event", "Current Live match", "transfer window", "Odds for all event scheduled"],
         );
         m.insert(
             "Get latest crypto charts".to_string(),
@@ -14,7 +14,7 @@ lazy_static! {
         );
         m.insert(
             "top trending movies".to_string(),
-            vec!["red", "green", "blue"],
+            vec!["Top trending Movie", "Popular Movie", "Movies in Theatres", "Upcoming Movie"],
         );
         m
     };
